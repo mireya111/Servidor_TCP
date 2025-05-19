@@ -1,59 +1,62 @@
 package servidor.servicio;
 
+import clase.Persona;
+
+import java.io.*;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
 
 public class Servidor {
 
-    public void servicio(){
+    public static String getFecha(String nombre, String jornada){
+        Date date = new Date();
+        DateFormat formato = new SimpleDateFormat("HH:mm:ss");
+        return nombre + jornada + "Hora de Ingreso registrada en el Servidor " + formato.format(date);
+    }
+    public void escribir (List<Persona> lista, String ruta) throws Exception{
+        FileOutputStream fos = new FileOutputStream(ruta);
+        ObjectOutputStream oos = new  ObjectOutputStream(fos);
+        oos.writeObject(lista);
+        oos.close();
+        System.out.println("Archivo creado exitosamente");
+    }
+    public List <Persona> leer (String ruta) throws IOException, ClassNotFoundException {
+        FileInputStream fis = new FileInputStream(ruta);
+        ObjectInputStream ois = new ObjectInputStream(fis);
+        List <Persona> lista = (List <Persona>) ois.readObject();
+        ois.close();
+        return lista;
+    }
+    //Procesar solicitud
+    public static void procesarSolicitud(int puerto) throws Exception{
+        ServerSocket servidor = new ServerSocket(puerto);
+        System.out.println("Servidor de fecha corriendo ....");
 
-        int puerto = 5000;
-        try {
-            DatagramSocket socket = new DatagramSocket(puerto); //Crear el datagram
-            System.out.println("Servidor UDP corriendo en el puerto " + puerto + "...");
+        while(true){
+            Socket cliente = servidor.accept();
+            System.out.println("CLiente conectado");
+            InputStream in = cliente.getInputStream();
+            OutputStream out = cliente.getOutputStream();
 
-            byte[] bufferEntrada = new byte[1024]; //convertir el mensaje a cadena de bytes
-            while (true) {
-                // Recibir datos del cliente
-                DatagramPacket paqueteEntrada = new DatagramPacket(bufferEntrada, bufferEntrada.length);
-                socket.receive(paqueteEntrada);
+            //Leer el nombre del empleado
+            DataInputStream dis = new DataInputStream(in);
+            String nombre = dis.readUTF();
+            if (nombre.equals("x")) break;
+            String jornada = dis.readUTF();
+            String resultado = Servidor.getFecha(nombre, jornada);
+            System.out.println("Mensaje recibido exitosamente");
+            //Devolver la respuesta al cliente
+            DataOutputStream dos = new DataOutputStream(out);
+            dos.writeUTF(resultado);
+            cliente.close();
 
-                String mensajeRecibido = new String(paqueteEntrada.getData(), 0, paqueteEntrada.getLength());
-                System.out.println("Mensaje recibido: " + mensajeRecibido);
-
-                // Procesar el mensaje
-                String[] numeros = mensajeRecibido.split(",");
-                if (numeros.length == 2) {
-                    try {
-                        int num1 = Integer.parseInt(numeros[0].trim());
-                        int num2 = Integer.parseInt(numeros[1].trim());
-                        int suma = num1 + num2;
-                        int resta = num1 - num2;
-                        int multiplicacion = num1 * num2;
-                        int dividir = num1 / num2;
-
-                        String respuesta = "Suma: " + suma + "/n"+ "Resta: "+ resta + "/n"+"Multiplicación: "+ multiplicacion+"/n"+"Divición: "+ dividir;
-                        byte[] bufferSalida = respuesta.getBytes();
-
-                        // Enviar respuesta al cliente
-                        DatagramPacket paqueteSalida = new DatagramPacket(
-                                bufferSalida,
-                                bufferSalida.length,
-                                paqueteEntrada.getAddress(),
-                                paqueteEntrada.getPort()
-                        );
-                        socket.send(paqueteSalida);
-                        System.out.println("Respuesta enviada: " + respuesta);
-                    } catch (NumberFormatException e) {
-                        System.out.println("Error al convertir los números.");
-                    }
-                } else {
-                    System.out.println("Formato de mensaje incorrecto.");
-                }
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
         }
+        servidor.close();
     }
 }
